@@ -3,6 +3,8 @@ package com.example.face2face
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.Rect
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -23,36 +25,33 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import com.example.face2face.databinding.ActivityMainBinding
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.facemesh.FaceMesh
 import com.google.mlkit.vision.facemesh.FaceMeshDetection
 import com.google.mlkit.vision.facemesh.FaceMeshDetectorOptions
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 @ExperimentalGetImage
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), FaceMeshListener {
 
     private lateinit var viewBinding: ActivityMainBinding
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
-
-    val defaultDetector = FaceMeshDetection.getClient()
-
-    val boundingBoxDetector = FaceMeshDetection.getClient(
-        FaceMeshDetectorOptions.Builder()
-            .setUseCase(FaceMeshDetectorOptions.BOUNDING_BOX_ONLY)
-            .build()
-    )
+    private val faceMeshAnalyzer = FaceMeshAnalyzer()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
 
+        faceMeshAnalyzer.faceMeshListener = this
+
         if (allPermissionsGranted()) {
             startCamera()
         } else {
             ActivityCompat.requestPermissions(
-                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
+            )
         }
 
         viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
@@ -68,15 +67,17 @@ class MainActivity : AppCompatActivity() {
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            if(Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX-Image")
             }
         }
 
         val outputOptions = ImageCapture.OutputFileOptions
-            .Builder(contentResolver,
+            .Builder(
+                contentResolver,
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues)
+                contentValues
+            )
             .build()
 
         imageCapture.takePicture(
@@ -87,11 +88,14 @@ class MainActivity : AppCompatActivity() {
                     Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
                 }
 
-                override fun
-                        onImageSaved(output: ImageCapture.OutputFileResults){
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     val msg = "Photo capture succeeded: ${output.savedUri}"
-                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
+                    output.savedUri?.let { uri ->
+                        InputImage.fromFilePath(applicationContext, uri).let { image ->
+                            faceMeshAnalyzer.process(image)
+                        }
+                    }
                 }
             }
         )
@@ -115,7 +119,7 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, FaceMeshAnalyzer() )
+                    it.setAnalyzer(cameraExecutor, faceMeshAnalyzer)
                 }
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -124,9 +128,10 @@ class MainActivity : AppCompatActivity() {
                 cameraProvider.unbindAll()
 
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture, imageAnalyzer)
+                    this, cameraSelector, preview, imageCapture, imageAnalyzer
+                )
 
-            } catch(exc: Exception) {
+            } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
 
@@ -135,7 +140,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
-            baseContext, it) == PackageManager.PERMISSION_GRANTED
+            baseContext, it
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     override fun onDestroy() {
@@ -145,14 +151,17 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<String>, grantResults:
-        IntArray) {
+        IntArray
+    ) {
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (allPermissionsGranted()) {
                 startCamera()
             } else {
-                Toast.makeText(this,
+                Toast.makeText(
+                    this,
                     "Permissions not granted by the user.",
-                    Toast.LENGTH_SHORT).show()
+                    Toast.LENGTH_SHORT
+                ).show()
                 finish()
             }
         }
@@ -164,7 +173,7 @@ class MainActivity : AppCompatActivity() {
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS =
-            mutableListOf (
+            mutableListOf(
                 Manifest.permission.CAMERA
             ).apply {
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
@@ -172,18 +181,48 @@ class MainActivity : AppCompatActivity() {
                 }
             }.toTypedArray()
     }
+
+    override fun onSuccess(faceMeshes: List<FaceMesh>) {
+        Toast.makeText(applicationContext, faceMeshes.size.toString(), Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onFailure() {
+        Toast.makeText(applicationContext, "Falha", Toast.LENGTH_SHORT).show()
+    }
+}
+
+interface FaceMeshListener {
+    fun onSuccess(faceMeshes: List<FaceMesh>)
+    fun onFailure()
 }
 
 @ExperimentalGetImage
 private class FaceMeshAnalyzer : ImageAnalysis.Analyzer {
 
-    override fun analyze(imageProxy: ImageProxy) {
+    var faceMeshListener: FaceMeshListener? = null
 
+    val detector = FaceMeshDetection.getClient()
+
+    var currentImage: InputImage? = null
+
+    override fun analyze(imageProxy: ImageProxy) {
+        Log.i("Testeeeee", "analyze")
         val mediaImage = imageProxy.image
         if (mediaImage != null) {
-            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-            // Pass image to an ML Kit Vision API
-            // ...
+            currentImage =
+                InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         }
+    }
+
+    fun process(image: InputImage) {
+        detector.process(image)
+            .addOnSuccessListener {
+                Log.i("Testeeeee", "success")
+                faceMeshListener?.onSuccess(it)
+            }
+            .addOnFailureListener {
+                Log.i("Testeeeee", "failure")
+                faceMeshListener?.onFailure()
+            }
     }
 }
