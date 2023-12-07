@@ -52,21 +52,6 @@ class PreviewFragment : Fragment() , FaceMeshListener {
         }
     }
 
-    private fun writeData(faceMeshes: List<FaceMesh>){
-        val csv = Environment.getExternalStorageDirectory().absolutePath
-        val writer = CSVWriter(FileWriter(csv))
-
-        val face = faceMeshes.first()
-
-        val newData =  face.allPoints.map {
-            arrayOf(it.index.toString(), it.position.x.toString(), it.position.y.toString(), it.position.z.toString())
-        }
-
-        writer.writeAll(newData)
-
-        writer.close()
-    }
-
     override fun onSuccess(faceMeshes: List<FaceMesh>) {
         val json = gson.toJson(faceMeshes)
         Log.i("json face2face", json)

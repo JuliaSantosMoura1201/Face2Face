@@ -21,7 +21,9 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.navigation.fragment.findNavController
+import com.bumptech.glide.Glide
 import com.example.face2face.databinding.FragmentCameraBinding
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.facemesh.FaceMesh
@@ -61,10 +63,11 @@ class CameraFragment : Fragment(), FaceMeshListener {
             )
         }
 
-        viewBinding.rotateCameraButton.setOnClickListener {
-            cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-        }
         viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
+        viewBinding.imageResetButton.setOnClickListener {
+            viewBinding.photoIv.visibility = View.GONE
+            viewBinding.preview.visibility = View.VISIBLE
+        }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
     }
@@ -85,16 +88,10 @@ class CameraFragment : Fragment(), FaceMeshListener {
             val preview = Preview.Builder()
                 .build()
                 .also {
-                    it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
+                    it.setSurfaceProvider(viewBinding.preview.surfaceProvider)
                 }
 
             imageCapture = ImageCapture.Builder().build()
-
-            val imageAnalyzer = ImageAnalysis.Builder()
-                .build()
-                .also {
-                    it.setAnalyzer(cameraExecutor, faceMeshAnalyzer)
-                }
 
 
             try {
@@ -143,15 +140,16 @@ class CameraFragment : Fragment(), FaceMeshListener {
                     val msg = "Photo capture succeeded: ${output.savedUri}"
                     Log.d(TAG, msg)
                     output.savedUri?.let { uri ->
-//                        InputImage.fromFilePath(requireContext(), uri).let { image ->
-//                            faceMeshAnalyzer.process(image)
-//                        }
-                        findNavController().navigate(
-                            R.id.action_cameraFragment_to_previewFragment,
-                            Bundle().apply {
-                                putString("imageUri", uri.toString())
-                            }
-                        )
+                        Glide.with(this@CameraFragment)
+                            .load(uri)
+                            .into(viewBinding.photoIv)
+
+                        viewBinding.photoIv.visibility = View.VISIBLE
+                        viewBinding.preview.visibility = View.GONE
+
+                        InputImage.fromFilePath(requireContext(), uri).let { image ->
+                            faceMeshAnalyzer.process(image)
+                        }
                     }
                 }
             }

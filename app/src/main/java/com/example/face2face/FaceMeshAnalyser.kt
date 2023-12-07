@@ -1,6 +1,5 @@
 package com.example.face2face
 
-import android.util.Log
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -17,7 +16,6 @@ class FaceMeshAnalyzer : ImageAnalysis.Analyzer {
     var currentImage: InputImage? = null
 
     override fun analyze(imageProxy: ImageProxy) {
-        Log.i("Testeeeee", "analyze")
         val mediaImage = imageProxy.image
         if (mediaImage != null) {
             currentImage =
@@ -28,11 +26,9 @@ class FaceMeshAnalyzer : ImageAnalysis.Analyzer {
     fun process(image: InputImage) {
         detector.process(image)
             .addOnSuccessListener {
-                Log.i("Testeeeee", "success")
                 faceMeshListener?.onSuccess(it)
             }
             .addOnFailureListener {
-                Log.i("Testeeeee", "failure")
                 faceMeshListener?.onFailure()
             }
     }
