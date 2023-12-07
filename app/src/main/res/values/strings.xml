@@ -9,4 +9,6 @@
     <string name="camera_fragment_probability_of_fraud_label">Probabilidade de fraude:</string>
     <string name="camera_fragment_type_of_fraud_label">Tipo de fraude:</string>
     <string name="camera_fragment_capture_button_content_description">Tirar foto</string>
+    <string name="bottom_nav_menu_camera_item">Camera</string>
+    <string name="bottom_nav_menu_results_item">Results</string>
 </resources>
