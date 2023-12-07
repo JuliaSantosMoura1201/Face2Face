@@ -1,6 +1,7 @@
 package com.example.face2face.result
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
@@ -22,8 +23,10 @@ class ResultAdapter(
         holder.resultProbabilityOfFraud.text = data[position].probabilityOfFraud
         holder.resultTypeOfFraud.text = data[position].typeOfFraud
 
+        val inputStream = context.assets.open(data[position].imagePath)
+        val bitmap = BitmapFactory.decodeStream(inputStream)
         Glide.with(context)
-            .load(data[position].imagePath)
+            .load(bitmap)
             .into(holder.resultImage)
     }
 

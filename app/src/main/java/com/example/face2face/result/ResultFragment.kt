@@ -35,7 +35,7 @@ class ResultFragment: Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val data = List(5){
             ResultData(
-                imagePath = "",
+                imagePath = "user1.png",
                 date = "30/11/23 - 18h00",
                 probabilityOfFraud = "99%",
                 typeOfFraud = "Vídeo"
