@@ -7,24 +7,22 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
-import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
-import androidx.navigation.fragment.findNavController
+import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
 import com.example.face2face.databinding.FragmentCameraBinding
+import com.example.face2face.model.Point
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.facemesh.FaceMesh
 import java.text.SimpleDateFormat
@@ -40,7 +38,6 @@ class CameraFragment : Fragment(), FaceMeshListener {
     private lateinit var cameraExecutor: ExecutorService
     private val faceMeshAnalyzer = FaceMeshAnalyzer()
     private var cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -70,6 +67,8 @@ class CameraFragment : Fragment(), FaceMeshListener {
         }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+
+        faceMeshAnalyzer.initializeTFLiteModels(requireContext())
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
@@ -181,7 +180,20 @@ class CameraFragment : Fragment(), FaceMeshListener {
     }
 
     override fun onSuccess(faceMeshes: List<FaceMesh>) {
-        Toast.makeText(context, faceMeshes.size.toString(), Toast.LENGTH_SHORT).show()
+        val faceMesh = faceMeshes.firstOrNull() ?: return
+
+        // Preparar dados e utilizar nos classificadores
+        val allPoints: Array<Array<Float>> = faceMesh.allPoints.map { faceMeshPoint ->
+            return@map arrayOf(
+                faceMeshPoint.position.x,
+                faceMeshPoint.position.y,
+                faceMeshPoint.position.z
+            )
+        }.toTypedArray()
+
+        // Obter retorno dos classificadores e atualizar o texto
+
+        // Salvar imagem no aparelho
     }
 
     override fun onFailure() {
